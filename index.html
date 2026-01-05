@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Повесить Колобка</title>
+  <style>
+    body { margin:0; padding:0; background:#111; overflow:hidden; }
+    canvas { display:block; }
+    #info { position:absolute; top:10px; left:10px; color:#fff; font-family:Arial; font-size:20px; z-index:10; }
+  </style>
+  
+  <!-- Phaser 3 -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <!-- Matter.js (встроен в Phaser 3) -->
+     <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+
+  <!-- iOS support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Иконка для всех остальных -->
+  <link rel="icon" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" sizes="512x512" href="icons/icon-512.png">
+</head>
+<body>
+  <div id="info">Затяни петлю!</div>
+
+  <script>
+    const config = {
+      type: Phaser.AUTO,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      physics: {
+        default: 'matter',
+        matter: {
+          gravity: { y: 1 },
+          debug: false // поставь true, если хочешь видеть хитбоксы
+        }
+      },
+      scene: {
+        preload: preload,
+        create: create,
+        update: update
+      },
+      backgroundColor: '#87CEEB'
+    };
+
+    const game = new Phaser.Game(config);
+
+    let kolobok, rope, sling, hanging = false;
+    let attempts = 3;
+
+    function preload() {
+      // Простые заглушки вместо картинок
+      this.load.image('kolobok', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRDQwMCIvPjxjaXJjbGUgY3g9IjM1IiBjeT0iNDAiIHI9IjgiIGZpbGw9IiMwMDAiLz48Y2lyY2xlIGN4PSI2NSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjjAwMCIvPjxwYXRoIGQ9Ik00MCA2MEM0NSA3NSA1NSA3NSA2MCA2MCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=');
+      this.load.image('rope', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iMTAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0zMCAxMEMzMCAxMCAzMCAxMDAgMzAgMTAwIiBzdHJva2U9IiM2RTJCMkYiIHN0cm9rZS13aWR0aD0iMjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==');
+    }
+
+    function create() {
+        this.input.touch.preventDefault = true;
+      this.matter.world.setBounds(0, 0, config.width, config.height, 32, true, true, false, true);
+
+      // Земля
+      this.matter.add.rectangle(config.width/2, config.height - 20, config.width, 40, { isStatic: true });
+
+      // Колобок
+      kolobok = this.matter.add.sprite(200, config.height - 100, 'kolobok').setScale(1.2);
+      kolobok.setBody({ type: 'circle', radius: 50 });
+      kolobok.setBounce(0.8);
+      kolobok.setVelocity(8, -10);
+
+      // Рогатка (статичная)
+      sling = this.add.rectangle(100, config.height - 150, 40, 40, 0x6E2B2F);
+      this.matter.add.gameObject(sling).setStatic(true);
+
+      // Петля (начальное положение у рогатки)
+      rope = this.matter.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
+      rope.setBody({ type: 'circle', radius: 30 });
+      rope.setBounce(0.3);
+
+      // События для тача/мыши
+      this.input.on('pointerdown', startDrag, this);
+      this.input.on('pointerup', releaseDrag, this);
+
+      // Текст попыток
+      this.attemptText = this.add.text(10, 50, `Попытки: ${attempts}`, { fontSize: '24px', color: '#fff' });
+    }
+
+    let pointerConstraint;
+    function startDrag(pointer) {
+      if (hanging) return;
+      const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
+      if (dist < 100) {
+        pointerConstraint = this.matter.add.pointerConstraint(pointer, rope, 0);
+      }
+    }
+
+    function releaseDrag(pointer) {
+      if (pointerConstraint) {
+        this.matter.removeConstraint(pointerConstraint);
+        pointerConstraint = null;
+      }
+    }
+
+    function update() {
+      if (hanging) return;
+
+      // Проверка попадания петли на Колобка
+      const dist = Phaser.Math.Distance.Between(rope.x, rope.y, kolobok.x, kolobok.y);
+      if (dist < 70 && !hanging) { // 70 — радиус Колобка + петли
+        hanging = true;
+
+        // Фиксируем Колобка к петле
+        this.matter.add.constraint(rope.body, kolobok.body, 0, 1);
+
+        // Поднимаем вверх (имитация затягивания)
+        this.tweens.add({
+          targets: rope,
+          y: rope.y - 200,
+          duration: 1500,
+          ease: 'Power2'
+        });
+
+        this.tweens.add({
+          targets: kolobok,
+          y: kolobok.y - 200,
+          duration: 1500,
+          ease: 'Power2',
+          onComplete: () => {
+            this.add.text(config.width/2 - 150, config.height/2, 'КОЛОБОК ПОВЕШЕН!', { fontSize: '48px', color: '#ff0000' }).setOrigin(0.5);
+          }
+        });
+
+        // Глаза закатываются (простая анимация)
+        this.tweens.add({
+          targets: kolobok,
+          angle: 30,
+          yoyo: true,
+          repeat: -1,
+          duration: 200
+        });
+      }
+
+      // Если Колобок укатился за экран — минус попытка
+      if (kolobok.x > config.width + 200 && !hanging) {
+        attempts--;
+        this.attemptText.setText(`Попытки: ${attempts}`);
+        if (attempts <= 0) {
+          this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал! Игра окончена', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
+          hanging = true;
+        } else {
+          resetKolobok.call(this);
+        }
+      }
+    }
+
+    function resetKolobok() {
+      kolobok.setPosition(200, config.height - 100);
+      kolobok.setVelocity(8, -10);
+      rope.setPosition(100, config.height - 150);
+      rope.setVelocity(0, 0);
+      hanging = false;
+    }
+    // Регистрация Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered: ', reg))
+          .catch(err => console.log('SW registration failed: ', err));
+      });
+    }
+    window.addEventListener('blur', function() {
+      if (game.scene.scenes[0]) game.scene.scenes[0].scene.pause();
+    });
+    window.addEventListener('focus', function() {
+      if (game.scene.scenes[0]) game.scene.scenes[0].scene.resume();
+    });
+  </script>
+</body>
+</html>
