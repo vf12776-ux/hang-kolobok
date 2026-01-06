@@ -8,6 +8,15 @@
     body { margin:0; padding:0; background:#111; overflow:hidden; }
     canvas { display:block; }
     #info { position:absolute; top:10px; left:10px; color:#fff; font-family:Arial; font-size:20px; z-index:10; }
+    #score {
+        position: absolute;
+        top: 40px;
+        left: 10px;
+        color: #fff;
+        font-family: Arial;
+        font-size: 16px;
+        z-index: 10;
+    }
   </style>
   
   <!-- Phaser 3 -->
@@ -28,6 +37,8 @@
 </head>
 <body>
   <div id="info">Затяни петлю!</div>
+  <div id="score">Попаданий: <span>0</span> | Промахов: <span>0</span></div>
+
 
   <script>
     const config = {
@@ -53,14 +64,23 @@
 
     let kolobok, rope, sling, hanging = false;
     let attempts = 3;
+    let hits = 0;
+let misses = 0;
 
     function preload() {
       // Простые заглушки вместо картинок
       this.load.image('kolobok', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRDQwMCIvPjxjaXJjbGUgY3g9IjM1IiBjeT0iNDAiIHI9IjgiIGZpbGw9IiMwMDAiLz48Y2lyY2xlIGN4PSI2NSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjjAwMCIvPjxwYXRoIGQ9Ik00MCA2MEM0NSA3NSA1NSA3NSA2MCA2MCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=');
       this.load.image('rope', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iMTAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0zMCAxMEMzMCAxMCAzMCAxMDAgMzAgMTAwIiBzdHJva2U9IiM2RTJCMkYiIHN0cm9rZS13aWR0aD0iMjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==');
-    }
+    
+    this.load.audio('hit', 'sounds/sound-1.wav');     // Попадание
+  this.load.audio('miss', 'sounds/sound-2.wav');    // Смех/ржание
+  this.load.audio('rope', 'sounds/sound-3.wav');    // Свист/бросок
+}
 
     function create() {
+      this.hitSound = this.sound.add('hit');
+    this.missSound = this.sound.add('miss');
+    this.ropeSound = this.sound.add('rope');
         this.input.touch.preventDefault = true;
       this.matter.world.setBounds(0, 0, config.width, config.height, 32, true, true, false, true);
 
@@ -88,6 +108,15 @@
 
       // Текст попыток
       this.attemptText = this.add.text(10, 50, `Попытки: ${attempts}`, { fontSize: '24px', color: '#fff' });
+      // Создаём текст для счёта (он заменит HTML-счётчик)
+this.scoreText = this.add.text(10, 80, `Попаданий: ${hits} | Промахов: ${misses}`, { 
+    fontSize: '20px', 
+    color: '#fff',
+    fontFamily: 'Arial'
+});
+
+// Обновляем HTML-счётчик (на всякий случай)
+document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
     }
 
     let pointerConstraint;
@@ -96,6 +125,7 @@
       const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
       if (dist < 100) {
         pointerConstraint = this.matter.add.pointerConstraint(pointer, rope, 0);
+        this.ropeSound.play();
       }
     }
 
@@ -113,6 +143,24 @@
       const dist = Phaser.Math.Distance.Between(rope.x, rope.y, kolobok.x, kolobok.y);
       if (dist < 70 && !hanging) { // 70 — радиус Колобка + петли
         hanging = true;
+        hits++;
+        updateScore.call(this);
+        this.hitSound.play();
+        const hitEmoji = this.add.text(kolobok.x, kolobok.y - 50, '😛💥', {
+    fontSize: '40px',
+    color: '#ff0000'
+}).setOrigin(0.5);
+
+// Анимация разрушения
+this.tweens.add({
+    targets: kolobok,
+    scaleX: 0.5,
+    angle: 90,
+    duration: 1000
+});
+
+// Убираем эмодзи через секунду
+this.time.delayedCall(1000, () => hitEmoji.destroy());
 
         // Фиксируем Колобка к петле
         this.matter.add.constraint(rope.body, kolobok.body, 0, 1);
@@ -148,6 +196,23 @@
       // Если Колобок укатился за экран — минус попытка
       if (kolobok.x > config.width + 200 && !hanging) {
         attempts--;
+        misses++;
+        updateScore.call(this);
+        this.missSound.play();
+        const missEmoji = this.add.text(kolobok.x, kolobok.y - 50, '😛🖕', {
+    fontSize: '40px',
+    color: '#ffff00'
+}).setOrigin(0.5);
+
+// Анимация подпрыгивания
+this.tweens.add({
+    targets: kolobok,
+    y: kolobok.y - 100,
+    duration: 300,
+    yoyo: true
+});
+
+this.time.delayedCall(1000, () => missEmoji.destroy());
         this.attemptText.setText(`Попытки: ${attempts}`);
         if (attempts <= 0) {
           this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал! Игра окончена', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
@@ -165,6 +230,13 @@
       rope.setVelocity(0, 0);
       hanging = false;
     }
+    function updateScore() {
+    if (this.scoreText) {
+        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
+    }
+    // Обновляем HTML-счётчик
+    document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
+}
     // Регистрация Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
