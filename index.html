@@ -95,6 +95,8 @@
     rope = this.physics.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
     rope.setBounce(0.3);
     rope.setCollideWorldBounds(true);
+    rope.setInteractive();  
+this.input.setDraggable(rope);  
 
     this.input.on('pointerdown', startDrag, this);
     this.input.on('pointerup', releaseDrag, this);
@@ -110,15 +112,29 @@
   }
 
   function startDrag(pointer) {
-    if (hanging) return;
-    const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
-    if (dist < 100) {
-      this.ropeSound.play();
-      const force = 400;
-      const angle = Phaser.Math.Angle.Between(rope.x, rope.y, pointer.x, pointer.y);
-      rope.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
-    }
+  if (hanging) return;
+  
+  // Проверяем, кликнули ли на петлю
+  if (rope.getBounds().contains(pointer.x, pointer.y)) {
+    this.ropeSound.play();
+    
+    // Бросок в сторону клика с силой
+    const force = 500;
+    const angle = Phaser.Math.Angle.Between(
+      rope.x, rope.y, 
+      pointer.x, pointer.y
+    );
+    
+    rope.setVelocity(
+      Math.cos(angle) * force,
+      Math.sin(angle) * force
+    );
+    
+    // Визуальная обратная связь
+    rope.setTint(0xffaa00);  // Петля становится оранжевой
+    this.time.delayedCall(200, () => rope.clearTint());
   }
+}
 
   function releaseDrag(pointer) {
     // Пустая функция
