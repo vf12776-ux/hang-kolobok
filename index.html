@@ -35,160 +35,160 @@
   <div id="score">Попаданий: <span>0</span> | Промахов: <span>0</span></div>
 
   <script>
-    const config = {
-      type: Phaser.AUTO,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { y: 200 },
-          debug: false
-        }
-      },
-      scene: {
-        preload: preload,
-        create: create,
-        update: update
-      },
-      backgroundColor: '#87CEEB'
-    };
+  const config = {
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: { y: 200 },
+        debug: false
+      }
+    },
+    scene: {
+      preload: preload,
+      create: create,
+      update: update
+    },
+    backgroundColor: '#87CEEB'
+  };
 
-    const game = new Phaser.Game(config);
+  const game = new Phaser.Game(config);
 
-    let kolobok, rope, sling, hanging = false;
-    let attempts = 3;
-    let hits = 0;
-    let misses = 0;
+  let kolobok, rope, sling, hanging = false;
+  let attempts = 3;
+  let hits = 0;
+  let misses = 0;
 
-    function preload() {
-      this.load.image('kolobok', 'images/kolobok.png');
-      
-      const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-      graphics.lineStyle(10, 0x8B4513, 1.0);
-      graphics.beginPath();
-      graphics.arc(30, 50, 20, 0, Math.PI * 2);
-      graphics.strokePath();
-      graphics.generateTexture('rope', 60, 100);
-      graphics.destroy();
-      
-      this.load.audio('hit', 'sounds/sound-1.wav');
-      this.load.audio('miss', 'sounds/sound-2.wav');
-      this.load.audio('rope', 'sounds/sound-3.wav');
+  function preload() {
+    this.load.image('kolobok', 'images/kolobok.png');
+    
+    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+    graphics.lineStyle(10, 0x8B4513, 1.0);
+    graphics.beginPath();
+    graphics.arc(30, 50, 20, 0, Math.PI * 2);
+    graphics.strokePath();
+    graphics.generateTexture('rope', 60, 100);
+    graphics.destroy();
+    
+    this.load.audio('hit', 'sounds/sound-1.wav');
+    this.load.audio('miss', 'sounds/sound-2.wav');
+    this.load.audio('rope', 'sounds/sound-3.wav');
+  }
+
+  function create() {
+    this.hitSound = this.sound.add('hit');
+    this.missSound = this.sound.add('miss');
+    this.ropeSound = this.sound.add('rope');
+    
+    let ground = this.physics.add.staticSprite(config.width/2, config.height - 20, null);
+    ground.setDisplaySize(config.width, 40);
+    
+    kolobok = this.physics.add.sprite(200, config.height - 100, 'kolobok').setScale(1.2);
+    kolobok.setBounce(0.8);
+    kolobok.setVelocity(150, -200);
+    kolobok.setCollideWorldBounds(true);
+    
+    sling = this.add.rectangle(100, config.height - 150, 40, 40, 0x6E2B2F);
+    
+    rope = this.physics.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
+    rope.setBounce(0.3);
+    rope.setCollideWorldBounds(true);
+
+    this.input.on('pointerdown', startDrag, this);
+    this.input.on('pointerup', releaseDrag, this);
+
+    this.attemptText = this.add.text(10, 50, `Попытки: ${attempts}`, { fontSize: '24px', color: '#fff' });
+    this.scoreText = this.add.text(10, 80, `Попаданий: ${hits} | Промахов: ${misses}`, { 
+      fontSize: '20px', 
+      color: '#fff',
+      fontFamily: 'Arial'
+    });
+
+    document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
+  }
+
+  function startDrag(pointer) {
+    if (hanging) return;
+    const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
+    if (dist < 100) {
+      this.ropeSound.play();
+      const force = 400;
+      const angle = Phaser.Math.Angle.Between(rope.x, rope.y, pointer.x, pointer.y);
+      rope.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
     }
+  }
 
-    function create() {
-      this.hitSound = this.sound.add('hit');
-      this.missSound = this.sound.add('miss');
-      this.ropeSound = this.sound.add('rope');
-      
-      let ground = this.physics.add.staticSprite(config.width/2, config.height - 20, null);
-      ground.setDisplaySize(config.width, 40);
-      
-      kolobok = this.physics.add.sprite(200, config.height - 100, 'kolobok').setScale(1.2);
-      kolobok.setBounce(0.8);
-      kolobok.setVelocity(150, -200);
-      kolobok.setCollideWorldBounds(true);
-      
-      sling = this.add.rectangle(100, config.height - 150, 40, 40, 0x6E2B2F);
-      
-      rope = this.physics.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
-      rope.setBounce(0.3);
-      rope.setCollideWorldBounds(true);
+  function releaseDrag(pointer) {
+    // Пустая функция
+  }
 
-      this.input.on('pointerdown', startDrag, this);
-      this.input.on('pointerup', releaseDrag, this);
+  function update() {
+    if (hanging) return;
 
-      this.attemptText = this.add.text(10, 50, `Попытки: ${attempts}`, { fontSize: '24px', color: '#fff' });
-      this.scoreText = this.add.text(10, 80, `Попаданий: ${hits} | Промахов: ${misses}`, { 
-        fontSize: '20px', 
-        color: '#fff',
-        fontFamily: 'Arial'
-      });
-
+    const dist = Phaser.Math.Distance.Between(rope.x, rope.y, kolobok.x, kolobok.y);
+    if (dist < 70 && !hanging) {
+      hanging = true;
+      hits++;
+      
+      this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
       document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
-    }
-
-    function startDrag(pointer) {
-      if (hanging) return;
-      const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
-      if (dist < 100) {
-        this.ropeSound.play();
-        const force = 400;
-        const angle = Phaser.Math.Angle.Between(rope.x, rope.y, pointer.x, pointer.y);
-        rope.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
-      }
-    }
-
-    function releaseDrag(pointer) {
-      // Пустая функция для обработчика
-    }
-
-    function update() {
-      if (hanging) return;
-
-      const dist = Phaser.Math.Distance.Between(rope.x, rope.y, kolobok.x, kolobok.y);
-      if (dist < 70 && !hanging) {
-        hanging = true;
-        hits++;
-        
-        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
-        document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
-        
-        this.hitSound.play();
-        this.add.text(rope.x, rope.y - 50, '😛💥', { fontSize: '40px' }).setOrigin(0.5);
-        
-        this.tweens.add({
-          targets: kolobok,
-          scaleX: 0.5,
-          angle: 90,
-          duration: 1000
-        });
-      }
-
-      if (kolobok.x > config.width + 200 && !hanging) {
-        attempts--;
-        misses++;
-        
-        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
-        document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
-        this.attemptText.setText(`Попытки: ${attempts}`);
-        
-        this.missSound.play();
-        this.add.text(kolobok.x, kolobok.y - 50, '😛🖕', { fontSize: '40px' }).setOrigin(0.5);
-        
-        if (attempts <= 0) {
-          this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал!', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
-          hanging = true;
-        } else {
-          resetKolobok.call(this);
-        }
-      }
-    }
-
-    function resetKolobok() {
-      kolobok.setPosition(200, config.height - 100);
-      kolobok.setVelocity(150, -200);
-      rope.setPosition(100, config.height - 150);
-      rope.setVelocity(0, 0);
-      hanging = false;
-    }
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('SW registered: ', reg))
-          .catch(err => console.log('SW registration failed: ', err));
+      
+      this.hitSound.play();
+      this.add.text(rope.x, rope.y - 50, '😛💥', { fontSize: '40px' }).setOrigin(0.5);
+      
+      this.tweens.add({
+        targets: kolobok,
+        scaleX: 0.5,
+        angle: 90,
+        duration: 1000
       });
     }
-    
-    window.addEventListener('blur', function() {
-      if (game.scene.scenes[0]) game.scene.scenes[0].scene.pause();
+
+    if (kolobok.x > config.width + 200 && !hanging) {
+      attempts--;
+      misses++;
+      
+      this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
+      document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
+      this.attemptText.setText(`Попытки: ${attempts}`);
+      
+      this.missSound.play();
+      this.add.text(kolobok.x, kolobok.y - 50, '😛🖕', { fontSize: '40px' }).setOrigin(0.5);
+      
+      if (attempts <= 0) {
+        this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал!', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
+        hanging = true;
+      } else {
+        resetKolobok.call(this);
+      }
+    }
+  }
+
+  function resetKolobok() {
+    kolobok.setPosition(200, config.height - 100);
+    kolobok.setVelocity(150, -200);
+    rope.setPosition(100, config.height - 150);
+    rope.setVelocity(0, 0);
+    hanging = false;
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('SW registered: ', reg))
+        .catch(err => console.log('SW registration failed: ', err));
     });
-    
-    window.addEventListener('focus', function() {
-      if (game.scene.scenes[0]) game.scene.scenes[0].scene.resume();
-    });
-  </script>
+  }
+  
+  window.addEventListener('blur', function() {
+    if (game.scene.scenes[0]) game.scene.scenes[0].scene.pause();
+  });
+  
+  window.addEventListener('focus', function() {
+    if (game.scene.scenes[0]) game.scene.scenes[0].scene.resume();
+  });
+</script>
 </body>
 </html>
