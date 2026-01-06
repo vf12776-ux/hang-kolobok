@@ -19,19 +19,14 @@
     }
   </style>
   
-  <!-- Phaser 3 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-  <!-- Matter.js (встроен в Phaser 3) -->
-     <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#111111">
 
-  <!-- iOS support -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-  <!-- Иконка для всех остальных -->
   <link rel="icon" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" sizes="512x512" href="icons/icon-512.png">
 </head>
@@ -39,17 +34,16 @@
   <div id="info">Затяни петлю!</div>
   <div id="score">Попаданий: <span>0</span> | Промахов: <span>0</span></div>
 
-
   <script>
     const config = {
       type: Phaser.AUTO,
       width: window.innerWidth,
       height: window.innerHeight,
       physics: {
-        default: 'matter',
-        matter: {
-          gravity: { y: 1 },
-          debug: false // поставь true, если хочешь видеть хитбоксы
+        default: 'arcade',
+        arcade: {
+          gravity: { y: 200 },
+          debug: false
         }
       },
       scene: {
@@ -65,157 +59,106 @@
     let kolobok, rope, sling, hanging = false;
     let attempts = 3;
     let hits = 0;
-let misses = 0;
+    let misses = 0;
 
     function preload() {
-      // Простые заглушки вместо картинок
-      this.load.image('kolobok', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRDQwMCIvPjxjaXJjbGUgY3g9IjM1IiBjeT0iNDAiIHI9IjgiIGZpbGw9IiMwMDAiLz48Y2lyY2xlIGN4PSI2NSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjjAwMCIvPjxwYXRoIGQ9Ik00MCA2MEM0NSA3NSA1NSA3NSA2MCA2MCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=');
-      this.load.image('rope', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iMTAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0zMCAxMEMzMCAxMCAzMCAxMDAgMzAgMTAwIiBzdHJva2U9IiM2RTJCMkYiIHN0cm9rZS13aWR0aD0iMjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==');
-    
-    this.load.audio('hit', 'sounds/sound-1.wav');     // Попадание
-  this.load.audio('miss', 'sounds/sound-2.wav');    // Смех/ржание
-  this.load.audio('rope', 'sounds/sound-3.wav');    // Свист/бросок
-}
+      this.load.image('kolobok', 'images/kolobok.png');
+      
+      const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+      graphics.lineStyle(10, 0x8B4513, 1.0);
+      graphics.beginPath();
+      graphics.arc(30, 50, 20, 0, Math.PI * 2);
+      graphics.strokePath();
+      graphics.generateTexture('rope', 60, 100);
+      graphics.destroy();
+      
+      this.load.audio('hit', 'sounds/sound-1.wav');
+      this.load.audio('miss', 'sounds/sound-2.wav');
+      this.load.audio('rope', 'sounds/sound-3.wav');
+    }
 
     function create() {
       this.hitSound = this.sound.add('hit');
-    this.missSound = this.sound.add('miss');
-    this.ropeSound = this.sound.add('rope');
-        this.input.touch.preventDefault = true;
-      this.matter.world.setBounds(0, 0, config.width, config.height, 32, true, true, false, true);
-
-      // Земля
-      this.matter.add.rectangle(config.width/2, config.height - 20, config.width, 40, { isStatic: true });
-
-      // Колобок
-      kolobok = this.matter.add.sprite(200, config.height - 100, 'kolobok').setScale(1.2);
-      kolobok.setBody({ type: 'circle', radius: 50 });
+      this.missSound = this.sound.add('miss');
+      this.ropeSound = this.sound.add('rope');
+      
+      let ground = this.physics.add.staticSprite(config.width/2, config.height - 20, null);
+      ground.setDisplaySize(config.width, 40);
+      
+      kolobok = this.physics.add.sprite(200, config.height - 100, 'kolobok').setScale(1.2);
       kolobok.setBounce(0.8);
-      kolobok.setVelocity(8, -10);
-
-      // Рогатка (статичная)
+      kolobok.setVelocity(150, -200);
+      kolobok.setCollideWorldBounds(true);
+      
       sling = this.add.rectangle(100, config.height - 150, 40, 40, 0x6E2B2F);
-      this.matter.add.gameObject(sling).setStatic(true);
-
-      // Петля (начальное положение у рогатки)
-      rope = this.matter.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
-      rope.setBody({ type: 'circle', radius: 30 });
+      
+      rope = this.physics.add.sprite(100, config.height - 150, 'rope').setScale(0.8);
       rope.setBounce(0.3);
+      rope.setCollideWorldBounds(true);
 
-      // События для тача/мыши
       this.input.on('pointerdown', startDrag, this);
       this.input.on('pointerup', releaseDrag, this);
 
-      // Текст попыток
       this.attemptText = this.add.text(10, 50, `Попытки: ${attempts}`, { fontSize: '24px', color: '#fff' });
-      // Создаём текст для счёта (он заменит HTML-счётчик)
-this.scoreText = this.add.text(10, 80, `Попаданий: ${hits} | Промахов: ${misses}`, { 
-    fontSize: '20px', 
-    color: '#fff',
-    fontFamily: 'Arial'
-});
+      this.scoreText = this.add.text(10, 80, `Попаданий: ${hits} | Промахов: ${misses}`, { 
+        fontSize: '20px', 
+        color: '#fff',
+        fontFamily: 'Arial'
+      });
 
-// Обновляем HTML-счётчик (на всякий случай)
-document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
+      document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
     }
 
-    let pointerConstraint;
     function startDrag(pointer) {
       if (hanging) return;
       const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, rope.x, rope.y);
       if (dist < 100) {
-        pointerConstraint = this.matter.add.pointerConstraint(pointer, rope, 0);
         this.ropeSound.play();
+        const force = 400;
+        const angle = Phaser.Math.Angle.Between(rope.x, rope.y, pointer.x, pointer.y);
+        rope.setVelocity(Math.cos(angle) * force, Math.sin(angle) * force);
       }
     }
 
     function releaseDrag(pointer) {
-      if (pointerConstraint) {
-        this.matter.removeConstraint(pointerConstraint);
-        pointerConstraint = null;
-      }
+      // Пустая функция для обработчика
     }
 
     function update() {
       if (hanging) return;
 
-      // Проверка попадания петли на Колобка
       const dist = Phaser.Math.Distance.Between(rope.x, rope.y, kolobok.x, kolobok.y);
-      if (dist < 70 && !hanging) { // 70 — радиус Колобка + петли
+      if (dist < 70 && !hanging) {
         hanging = true;
         hits++;
-        updateScore.call(this);
+        
+        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
+        document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
+        
         this.hitSound.play();
-        const hitEmoji = this.add.text(kolobok.x, kolobok.y - 50, '😛💥', {
-    fontSize: '40px',
-    color: '#ff0000'
-}).setOrigin(0.5);
-
-// Анимация разрушения
-this.tweens.add({
-    targets: kolobok,
-    scaleX: 0.5,
-    angle: 90,
-    duration: 1000
-});
-
-// Убираем эмодзи через секунду
-this.time.delayedCall(1000, () => hitEmoji.destroy());
-
-        // Фиксируем Колобка к петле
-        this.matter.add.constraint(rope.body, kolobok.body, 0, 1);
-
-        // Поднимаем вверх (имитация затягивания)
-        this.tweens.add({
-          targets: rope,
-          y: rope.y - 200,
-          duration: 1500,
-          ease: 'Power2'
-        });
-
+        this.add.text(rope.x, rope.y - 50, '😛💥', { fontSize: '40px' }).setOrigin(0.5);
+        
         this.tweens.add({
           targets: kolobok,
-          y: kolobok.y - 200,
-          duration: 1500,
-          ease: 'Power2',
-          onComplete: () => {
-            this.add.text(config.width/2 - 150, config.height/2, 'КОЛОБОК ПОВЕШЕН!', { fontSize: '48px', color: '#ff0000' }).setOrigin(0.5);
-          }
-        });
-
-        // Глаза закатываются (простая анимация)
-        this.tweens.add({
-          targets: kolobok,
-          angle: 30,
-          yoyo: true,
-          repeat: -1,
-          duration: 200
+          scaleX: 0.5,
+          angle: 90,
+          duration: 1000
         });
       }
 
-      // Если Колобок укатился за экран — минус попытка
       if (kolobok.x > config.width + 200 && !hanging) {
         attempts--;
         misses++;
-        updateScore.call(this);
-        this.missSound.play();
-        const missEmoji = this.add.text(kolobok.x, kolobok.y - 50, '😛🖕', {
-    fontSize: '40px',
-    color: '#ffff00'
-}).setOrigin(0.5);
-
-// Анимация подпрыгивания
-this.tweens.add({
-    targets: kolobok,
-    y: kolobok.y - 100,
-    duration: 300,
-    yoyo: true
-});
-
-this.time.delayedCall(1000, () => missEmoji.destroy());
+        
+        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
+        document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
         this.attemptText.setText(`Попытки: ${attempts}`);
+        
+        this.missSound.play();
+        this.add.text(kolobok.x, kolobok.y - 50, '😛🖕', { fontSize: '40px' }).setOrigin(0.5);
+        
         if (attempts <= 0) {
-          this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал! Игра окончена', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
+          this.add.text(config.width/2 - 200, config.height/2, 'Колобок сбежал!', { fontSize: '36px', color: '#fff' }).setOrigin(0.5);
           hanging = true;
         } else {
           resetKolobok.call(this);
@@ -225,19 +168,12 @@ this.time.delayedCall(1000, () => missEmoji.destroy());
 
     function resetKolobok() {
       kolobok.setPosition(200, config.height - 100);
-      kolobok.setVelocity(8, -10);
+      kolobok.setVelocity(150, -200);
       rope.setPosition(100, config.height - 150);
       rope.setVelocity(0, 0);
       hanging = false;
     }
-    function updateScore() {
-    if (this.scoreText) {
-        this.scoreText.setText(`Попаданий: ${hits} | Промахов: ${misses}`);
-    }
-    // Обновляем HTML-счётчик
-    document.getElementById('score').innerHTML = `Попаданий: <span>${hits}</span> | Промахов: <span>${misses}</span>`;
-}
-    // Регистрация Service Worker
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
@@ -245,9 +181,11 @@ this.time.delayedCall(1000, () => missEmoji.destroy());
           .catch(err => console.log('SW registration failed: ', err));
       });
     }
+    
     window.addEventListener('blur', function() {
       if (game.scene.scenes[0]) game.scene.scenes[0].scene.pause();
     });
+    
     window.addEventListener('focus', function() {
       if (game.scene.scenes[0]) game.scene.scenes[0].scene.resume();
     });
